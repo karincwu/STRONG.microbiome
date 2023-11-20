@@ -37,6 +37,15 @@ tax_table()   Taxonomy Table:    [ 2770 taxa by 7 taxonomic ranks ]
 phy_tree()    Phylogenetic Tree: [ 2770 tips and 2768 internal nodes ]
 refseq()      DNAStringSet:      [ 2770 reference sequences ]
 
+Notes for the analysis below: 
+phy = phyloseq object
+timepint = preop or 6 months postop after LSG (study design)
+alpha = alpha-diversity metrics such as shannon, chao1, equitability, PD_whole_tree
+outcome = outcome variables of interest
+covariate# = variables for adjustment
+beta = beta-diversity metrics such as wunifrac, unifrac, bray, canberra
+SubjectID = participant identification
+
 
 (3) Alpha-diversity
 * Calculating the 4 metrics
@@ -47,32 +56,54 @@ Faith's phylogenetic diversity: sample_data(phy)$PD_whole_tree <- picante::pd(ot
 
 * Baseline alpha-diversity correlation with bone outcomes (cross-sectional)
 phy_df <- data.frame(sample_data(phy))
-phy_pre <- subset(phy_df, timepoint=="Preop")
-cor.test(phy_pre$alpha,phy_pre$bone,method="spearman") 
-partial_Spearman(alpha | bone ~ covariate1 + covariate2 + covariate3,data=phy_pre)
+phy_pre_df <- subset(phy_df, timepoint=="Preop")
+cor.test(phy_pre_df$alpha,phy_pre_df$bone,method="spearman") 
+partial_Spearman(alpha | bone ~ covariate1 + covariate2 + covariate3,data=phy_pre_df)
 
 * Pre-post LSG alpha-diveristy graph and statistical test for difference 
 ggplot(data=sample_data(phy), aes(x=timepoint, y=shannon, fill=timepoint)) + geom_boxplot() + stat_compare_means(method="wilcoxon",paired=TRUE)
 
-Notes: 
-phy = phyloseq object
-alpha = alpha-diversity metrics such as shannon, chao1, equitability, PD_whole_tree
-timepint = preop or 6 months postop after LSG (study design)
-outcome = outcome variables of interest
-covariate# = variables for adjustment
-
 
 (4) Beta-diversity 
 * Calculating the 4 metrics
-d <- phyloseq::distance(phy,method="beta")  ## method = "wunifrac" or "unifrac" or "bray" or "canberra"
-pnove <- vegan::adonis2(d1 ~timepoint, data=data.frame(phy@sam_data))
+d <- phyloseq::distance(phy,method="beta")  ## beta = "wunifrac" or "unifrac" or "bray" or "canberra"
+pnove <- vegan::adonis2(d ~timepoint, data=data.frame(phy@sam_data))
 ord <- ordinate(phy,method="PCoA",distance=d)
+
+* Baseline (preop) beta-diversity correlation with bone outcomes (cross-sectional)
+phy_pre <- subset_samples(phy,timepoint=="Preop")
+beta_pre <- phyloseq::distance(phy_pre, method="beta")
+beta_pre <- as.matrix(beta_pre)
+adonis2(beta_pre ~ bone, data = phy_pre_df)  ## PERMANOVA
+adonis2(beta_pre ~ bone + covariate1 + covariate2 + covariate3, data = phy_pre_df)  ## adjusted PERMANOVA
 
 * Pre-post LSG beta-diversity graph and statistical test for difference
 plot_ordination(phy, ord, type="samples", color="timepoint") +geom_point()+stat_ellipse() + 
   annotate("text", label=paste('R^2== ', round(pnove$R2[1], 3))) +  annotate("text", label=paste('P== ', round(pnove$`Pr(>F)`[1], 3)))
 
-Notes: 
-beta = beta-diversity metrics such as wunifrac, unifrac, bray, canberra
-timepint = preop or 6 months postop after LSG (study design)
 
+
+(5) Differential abudnance in microbial taxa pre-post LSG
+* Graphing individual participant relative abundance at the phylum level
+phy.rel <- transform_sample_counts(phy, function(x) x/sum(x)*100)
+glom <- tax_glom(phy.rel, taxrank = 'Phylum', NArm = FALSE)
+phy.melt <- psmelt(glom)
+phy.melt$Phylum <- as.character(phy.melt$Phylum)
+phy.melt <- phy.melt %>%
+  group_by(timepoint, Phylum) %>%
+  mutate(median=median(Abundance))
+keep <- unique(phy.melt$Phylum[phy.melt$median > 0.05])
+phy.melt$Phylum[!(phy.melt$Phylum %in% keep)] <- "<0.05%"
+phy.melt_sum <- phy.melt %>%
+  group_by(SubjectID,timepoint,Phylum) %>%
+  summarise(Abundance=sum(Abundance))
+
+RAp <- ggplot(phy.melt_sum, aes(x = SubjectID, y = Abundance, fill = Phylum)) + 
+  geom_bar(stat = "identity", aes(fill=Phylum)) + labs(x="", y="Relative Abundance (%)") +
+  facet_wrap(~timepoint, scales= "free_x", nrow=1) +
+  scale_fill_manual(values = c("gray","#F8766D","#B79F00","#00BA38","#00BFC4","#619CFF","#F564E3"))+
+  theme_classic() + 
+  theme(strip.background = element_blank(),
+        axis.text.x.bottom = element_text(angle = -90))
+
+RAp
