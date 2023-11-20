@@ -1,0 +1,78 @@
+** Microbiome Analysis Script **
+Analysis of this the 16S rRNA sequence data for this project was done in R (version 4.3.1). The following is an example of the codes used.
+
+(1) Load required packages
+library(PResiduals)
+library(phyloseq)
+library(vegan)
+library(tidyverse)
+library(dplyr)
+library(kableExtra)
+library(tibble)
+library(DESeq2)
+library(ANCOMBC)
+library(picante)
+library(lmerTest)
+library(cowplot)
+library(ggpubr)
+library(grid)
+library(gridExtra)
+library(scale)
+library(ggpicrust2)
+library(readr)
+library(ggprism)
+library(patchwork)
+library(data.table)
+library(biomformat)
+
+
+(2) Load in phyloseq object
+phy <- readRDS("finaltree1_strong_rare.rds")
+
+Output :
+phyloseq-class experiment-level object
+otu_table()   OTU Table:         [ 2770 taxa and 46 samples ]
+sample_data() Sample Data:       [ 46 samples by 42 sample variables ]
+tax_table()   Taxonomy Table:    [ 2770 taxa by 7 taxonomic ranks ]
+phy_tree()    Phylogenetic Tree: [ 2770 tips and 2768 internal nodes ]
+refseq()      DNAStringSet:      [ 2770 reference sequences ]
+
+
+(3) Alpha-diversity
+* Calculating the 4 metrics
+Shannon's index: sample_data(phy)$shannon <- diversity(otu_table(phy))      
+Pielou's evenness: sample_data(phy)$equitability <- diversity(otu_table(phy))/log(specnumber(otu_table(phy)))
+Chao1 richness: sample_data(phy)$chao1 <- t(estimateR(otu_table(phy)))[,2] 
+Faith's phylogenetic diversity: sample_data(phy)$PD_whole_tree <- picante::pd(otu_table(phy), phy_tree(phy), include.root = F)[,1]
+
+* Baseline alpha-diversity correlation with bone outcomes (cross-sectional)
+phy_df <- data.frame(sample_data(phy))
+phy_pre <- subset(phy_df, timepoint=="Preop")
+cor.test(phy_pre$alpha,phy_pre$bone,method="spearman") 
+partial_Spearman(alpha | bone ~ covariate1 + covariate2 + covariate3,data=phy_pre)
+
+* Pre-post LSG alpha-diveristy graph and statistical test for difference 
+ggplot(data=sample_data(phy), aes(x=timepoint, y=shannon, fill=timepoint)) + geom_boxplot() + stat_compare_means(method="wilcoxon",paired=TRUE)
+
+Notes: 
+phy = phyloseq object
+alpha = alpha-diversity metrics such as shannon, chao1, equitability, PD_whole_tree
+timepint = preop or 6 months postop after LSG (study design)
+outcome = outcome variables of interest
+covariate# = variables for adjustment
+
+
+(4) Beta-diversity 
+* Calculating the 4 metrics
+d <- phyloseq::distance(phy,method="beta")  ## method = "wunifrac" or "unifrac" or "bray" or "canberra"
+pnove <- vegan::adonis2(d1 ~timepoint, data=data.frame(phy@sam_data))
+ord <- ordinate(phy,method="PCoA",distance=d)
+
+* Pre-post LSG beta-diversity graph and statistical test for difference
+plot_ordination(phy, ord, type="samples", color="timepoint") +geom_point()+stat_ellipse() + 
+  annotate("text", label=paste('R^2== ', round(pnove$R2[1], 3))) +  annotate("text", label=paste('P== ', round(pnove$`Pr(>F)`[1], 3)))
+
+Notes: 
+beta = beta-diversity metrics such as wunifrac, unifrac, bray, canberra
+timepint = preop or 6 months postop after LSG (study design)
+
