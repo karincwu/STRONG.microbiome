@@ -2,35 +2,10 @@
 Analysis of this the 16S rRNA sequence data for this project was done in R (version 4.3.1). The following is an example of the codes used.
 
 (1) Load required packages
-library(PResiduals)
-library(phyloseq)
-library(vegan)
-library(tidyverse)
-library(dplyr)
-library(kableExtra)
-library(tibble)
-library(DESeq2)
-library(ANCOMBC)
-library(picante)
-library(lmerTest)
-library(cowplot)
-library(ggpubr)
-library(grid)
-library(gridExtra)
-library(scale)
-library(ggpicrust2)
-library(readr)
-library(ggprism)
-library(patchwork)
-library(data.table)
-library(biomformat)
-library(ggpicrust2)
-library(readr)
-library(ggprism)
-library(patchwork)
-library(data.table)
-library(biomformat)
-library(KEGGREST)
+packages <- c('PResiduals', 'phyloseq', 'vegan', 'ggplot2', 'dplyr', 'tidyverse', 'kableExtra', 'tibble', 'DESeq2', 'ANCOMBC', picante,
+  'lmerTest', 'cowplot', 'ggpubr', 'grid', 'gridExtra', 'ggpicrust2', 'readr', 'ggprism', 'patchwork', 'data.table', 'biomformat', 'KEGGREST')
+lapply(packages, library, character.only=TRUE)
+
 
 (2) Load in phyloseq object
 phy <- readRDS("finaltree1_strong_rare.rds")
