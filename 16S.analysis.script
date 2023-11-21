@@ -98,12 +98,33 @@ phy.melt_sum <- phy.melt %>%
   group_by(SubjectID,timepoint,Phylum) %>%
   summarise(Abundance=sum(Abundance))
 
-RAp <- ggplot(phy.melt_sum, aes(x = SubjectID, y = Abundance, fill = Phylum)) + 
-  geom_bar(stat = "identity", aes(fill=Phylum)) + labs(x="", y="Relative Abundance (%)") +
-  facet_wrap(~timepoint, scales= "free_x", nrow=1) +
-  scale_fill_manual(values = c("gray","#F8766D","#B79F00","#00BA38","#00BFC4","#619CFF","#F564E3"))+
-  theme_classic() + 
-  theme(strip.background = element_blank(),
-        axis.text.x.bottom = element_text(angle = -90))
+ggplot(phy.melt_sum, aes(x = SubjectID, y = Abundance, fill = Phylum)) + 
+  geom_bar() + facet_wrap(~timepoint, scales= "free_x", nrow=1)
 
-RAp
+* Differential abundance pre-post LSG
+phy.taxa <- tax_glom(phy, taxrank = 'Species', NArm = FALSE)
+out = ancombc(
+  phyloseq = phy.taxa, 
+  p_adj_method = "fdr", 
+  formula="timepoint",
+  lib_cut = 0, 
+  group = "timepoint", 
+  struc_zero = TRUE, 
+  neg_lb = TRUE, 
+  tol = 1e-5, 
+  max_iter = 100, 
+  conserve = TRUE, 
+  alpha = 0.05, 
+)
+res <- out$res
+res_tbl <- as.data.frame(do.call(cbind, res))
+sig_taxa = res_tbl %>%
+  dplyr::filter(diff_abn.timepoint6mo == "TRUE") 
+sig_taxa$change <- ifelse(sig_taxa$lfc.timepoint6mo > 0,"increase", "decrease")
+tax_tbl <- as.data.frame(tax_table(phy))
+tax_tbl$lfc.taxon <- row.names(tax_tbl)
+sig_taxa <- merge(sig_taxa, tax_tbl, by = "lfc.taxon")  #show SV's taxa
+
+ggplot(subset(sig_taxa, !is.na(combine)), aes(x=reorder(combine,-lfc.timepoint6mo), y=lfc.timepoint6mo, fill=Phylum, color=Phylum)) +
+  geom_bar(stat="identity")
+
