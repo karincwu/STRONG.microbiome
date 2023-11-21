@@ -51,6 +51,7 @@ outcome = outcome variables of interest
 covariate# = variables for adjustment
 beta = beta-diversity metrics such as wunifrac, unifrac, bray, canberra
 SubjectID = participant identification
+SV# = specific sequence variant 
 
 
 (3) Alpha-diversity
@@ -96,9 +97,18 @@ plot_ordination(phy, ord, type="samples", color="timepoint") +geom_point()+stat_
   annotate("text", label=paste('R^2== ', round(pnove$R2[1], 3))) +  annotate("text", label=paste('P== ', round(pnove$`Pr(>F)`[1], 3)))
 
 * Change in beta-diversity and change in outcomes (longitudinal correlation)
-d.m = melt(as.matrix(d)) #from distance matrixd3.m = d3.m %>%
+d.m = melt(as.matrix(d)) #from distance matrix
 d.m = d.m %>% filter(as.character(Var1) != as.character(Var2)) %>% mutate_if(is.factor, as.character) #remove self comparison
-
+d.m$Var1t <- ifelse(grepl(".PRE",d3.m$Var1),"PRE","6mo") #create Var1 timepoint variable
+d.m$Var2t <- ifelse(grepl(".PRE",d3.m$Var2),"PRE","6mo") #create Var 2 timepoint variable
+d.m$SID1 <-  gsub("[.]PRE|[.]6","",d3.m$Var1) #create participant ID variable
+d.m$SID2 <-  gsub("[.]PRE|[.]6","",d3.m$Var2) #create participant ID variable
+d.m$beta_delta <- ifelse(d.m$SID1==d.m$SID2 & d.m$Var1t!=d.m$Var2t, d.m$value, NA) #create variable with value only in same participant
+d.m <- d.m %>% drop_na() #delete all other rows
+d.m <- d.m[!duplicated(d.m$SID1),] #delete duplicates (from distance matrix pre-6mo vs. 6mo-pre)
+phy_merge_df$beta_delta <- d.m$beta_delta
+cor.test(phy_merge_df$beta_delta, phy_merge_df$outcome_delta,method="spearman")
+partial_Spearman(beta_delta | outcome_delta ~ covariate1 + covariate2 + covariate3, data=phy_merge_df)
 
 
 (5) Differential abudnance in microbial taxa pre-post LSG
@@ -145,7 +155,13 @@ ggplot(subset(sig_taxa, !is.na(combine)), aes(x=reorder(combine,-lfc.timepoint6m
   geom_bar(stat="identity")
 
 * Postop abundance of microbial taxa and change in outcomes correlation
-
+phy_taxa_post <- subset_samples(phy.taxa,timepoint=="6mo") #subset data to only postop timepoint using phy.taxa
+abg <- otu_table(phy_taxa_post)/rowSums(otu_table(phy_taxa_post))*100 #calculate abundance
+OTU.abund <- otu_table(phy_taxa_post)[,apply(abg,MARGIN=2,function(x) any(x>5))]
+cor.separman = cor(OTU.abund,sample_data(phy_taxa_post)$outcome_delta,method="spearman")
+OTU.abund.df <- data.frame(OTU.abund)
+cor.test(OTU.abund.df$SV#,sample_data(phy_taxa_post)$outcome_delta,method="spearman")
+partial_Spearman(SV# | outcome_delta ~ covariate1 + covariate2 + covariate3, data=sample_data(phy_taxa_post))
 
 
 (6) PICRUSt2 (v2.5.2) analysis
