@@ -115,7 +115,6 @@ phy.melt$Phylum[!(phy.melt$Phylum %in% keep)] <- "<0.05%"
 phy.melt_sum <- phy.melt %>%
   group_by(SubjectID,timepoint,Phylum) %>%
   summarise(Abundance=sum(Abundance))
-
 ggplot(phy.melt_sum, aes(x = SubjectID, y = Abundance, fill = Phylum)) + 
   geom_bar() + facet_wrap(~timepoint, scales= "free_x", nrow=1)
 
@@ -142,7 +141,6 @@ sig_taxa$change <- ifelse(sig_taxa$lfc.timepoint6mo > 0,"increase", "decrease")
 tax_tbl <- as.data.frame(tax_table(phy))
 tax_tbl$lfc.taxon <- row.names(tax_tbl)
 sig_taxa <- merge(sig_taxa, tax_tbl, by = "lfc.taxon")  #show SV's taxa
-
 ggplot(subset(sig_taxa, !is.na(combine)), aes(x=reorder(combine,-lfc.timepoint6mo), y=lfc.timepoint6mo, fill=Phylum, color=Phylum)) +
   geom_bar(stat="identity")
 
