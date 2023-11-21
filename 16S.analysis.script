@@ -24,7 +24,13 @@ library(ggprism)
 library(patchwork)
 library(data.table)
 library(biomformat)
-
+library(ggpicrust2)
+library(readr)
+library(ggprism)
+library(patchwork)
+library(data.table)
+library(biomformat)
+library(KEGGREST)
 
 (2) Load in phyloseq object
 phy <- readRDS("finaltree1_strong_rare.rds")
@@ -90,6 +96,9 @@ plot_ordination(phy, ord, type="samples", color="timepoint") +geom_point()+stat_
   annotate("text", label=paste('R^2== ', round(pnove$R2[1], 3))) +  annotate("text", label=paste('P== ', round(pnove$`Pr(>F)`[1], 3)))
 
 * Change in beta-diversity and change in outcomes (longitudinal correlation)
+d.m = melt(as.matrix(d)) #from distance matrixd3.m = d3.m %>%
+d.m = d.m %>% filter(as.character(Var1) != as.character(Var2)) %>% mutate_if(is.factor, as.character) #remove self comparison
+
 
 
 (5) Differential abudnance in microbial taxa pre-post LSG
@@ -137,4 +146,34 @@ sig_taxa <- merge(sig_taxa, tax_tbl, by = "lfc.taxon")  #show SV's taxa
 ggplot(subset(sig_taxa, !is.na(combine)), aes(x=reorder(combine,-lfc.timepoint6mo), y=lfc.timepoint6mo, fill=Phylum, color=Phylum)) +
   geom_bar(stat="identity")
 
-* aseline (preop) beta-diversity correlation with change in outcomes (longitudinal)
+* Postop abundance of microbial taxa and change in outcomes correlation
+
+
+
+(6) PICRUSt2 (v2.5.2) analysis
+* Prepping for input files from phyloseq object
+otu <- t(as(otu_table(phy),"matrix"))
+otu_biom <-make_biom(data=otu)
+write_biom(otu_biom,"otu.biom")
+phy %>% refseq() %>% Biostrings::writeXStringSet("/fileLocation/rep_seqs.fna",append=FALSE,compress=FALSE,compression_level=NA,format="fasta")
+
+* Run on terminal
+conda activate picrust2 
+picrust2_pipeline.py -s rep_seqs.fna -i otu.biom -o picrust2_out_pipeline -p 1
+
+* Load back PICRUSt2 output
+daa_results_list <-
+  ggpicrust2(
+    file="/fileLocation/pred_metagenome_unstrat.tsv",
+    metadata = phy_df,
+    group = "timepoint",
+    pathway = "KO",
+    daa_method = "LinDA",
+    order = "pathway_class",
+    ko_to_kegg = TRUE,
+    x_lab = "pathway_name",
+    p.adjust = "BH",
+    select = NULL,
+    reference = NULL
+  )
+
